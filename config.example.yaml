@@ -1,0 +1,29 @@
+ad:
+  ldap_url: "ldap://ad.example.com:389"
+  bind_dn: "CN=service-account,OU=ServiceAccounts,DC=example,DC=com"
+  bind_password: "your-service-account-password"
+  base_dn: "DC=example,DC=com"
+  allowed_groups:
+    - "CN=AI-Users,OU=Groups,DC=example,DC=com"
+    - "CN=Developers,OU=Groups,DC=example,DC=com"
+
+backends:
+  ollama_servers:
+    - "http://ollama1.example.com:11434"
+    - "http://ollama2.example.com:11434"
+    - "http://ollama3.example.com:11434"
+  openai_endpoint: "https://api.openai.com/v1"
+  openai_api_key: "sk-your-openai-api-key-here"
+
+https:
+  domain: "aiconnect.example.com"
+  cache_dir: "/var/cache/aiconnect/autocert"
+  port: 443
+
+monitoring:
+  health_check_interval: 30  # secondi
+  metrics_port: 9090
+
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json"  # json o text

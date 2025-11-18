@@ -1,0 +1,18 @@
+[Unit]
+Description=Ollama Metrics Server
+After=network.target
+
+[Service]
+Type=simple
+User=ollama
+Group=ollama
+ExecStart=/usr/bin/python3 /opt/ollama-metrics/ollama_metrics.py
+Restart=on-failure
+RestartSec=5s
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
