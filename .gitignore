@@ -4,8 +4,9 @@
 *~
 
 # Binari
-aiconnect
+/aiconnect
 /cmd/aiconnect/aiconnect
+aiconnect-linux-amd64
 
 # Config sensibili
 config.yaml
