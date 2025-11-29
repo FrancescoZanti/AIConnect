@@ -1,0 +1,51 @@
+# .dockerignore - File da escludere dal build context
+# Compatibile con Docker e Podman
+
+# Git
+.git
+.gitignore
+
+# Documentazione
+*.md
+!README.md
+
+# IDE e editor
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Binari compilati localmente
+aiconnect
+aiconnect-linux-amd64
+
+# Directory di build
+dist/
+build/
+
+# Vendor (usiamo go mod download nel container)
+vendor/
+
+# Cache e certificati locali
+autocert/
+*.pem
+*.key
+*.crt
+
+# Config sensibili (non copiare config reali)
+config.yaml
+!config.example.yaml
+
+# Test artifacts
+coverage.out
+*.test
+
+# Container files (non necessari nel context)
+Dockerfile
+Containerfile
+
+# GitHub
+.github/
