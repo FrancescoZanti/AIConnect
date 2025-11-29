@@ -297,86 +297,43 @@ monitoring:
 
 Intervalli brevi (10-15s) migliorano reattività ma aumentano carico rete. Default 30s è bilanciato per la maggior parte degli scenari.
 
-## Sviluppo e Contributi
+## Sviluppo
 
-### Struttura Codebase
+### Struttura Progetto
 
 ```
 aiconnect/
 ├── cmd/
-│   └── aiconnect/         # Entry point applicazione
+│   └── aiconnect/         # Main application
 │       └── main.go
 ├── internal/
-│   ├── auth/              # Middleware autenticazione LDAP
-│   ├── config/            # Parser configurazione YAML
-│   ├── loadbalancer/      # Load balancer Ollama con health checking
-│   ├── metrics/           # Collector metriche Prometheus
-│   └── proxy/             # Reverse proxy handler con routing
-├── tools/
-│   └── ollama-metrics/    # Server metriche per deployment su Ollama
+│   ├── auth/              # LDAP authentication
+│   ├── config/            # Configuration loading
+│   ├── loadbalancer/      # Ollama load balancing
+│   ├── metrics/           # Prometheus metrics
+│   └── proxy/             # Reverse proxy handler
 ├── deployment/
-│   ├── aiconnect.service  # Unit file systemd
-│   └── install.sh         # Script installazione automatica
-├── config.example.yaml    # Template configurazione
-├── go.mod                 # Dipendenze Go
-├── Makefile              # Build automation
+│   ├── aiconnect.service  # Systemd service
+│   └── install.sh         # Installation script
+├── config.example.yaml    # Configuration example
+├── go.mod
 └── README.md
 ```
 
-### Build e Test Locale
+### Test Locale
 
 ```bash
-# Compilazione binario
+# Build
 go build -o aiconnect ./cmd/aiconnect
 
-# Build ottimizzato per produzione
-go build -ldflags="-s -w" -o aiconnect ./cmd/aiconnect
-
-# Esecuzione con configurazione custom
+# Run con config custom
 AICONNECT_CONFIG=./config.yaml ./aiconnect
-
-# Test unitari
-go test ./...
-
-# Test con coverage
-go test -cover ./...
 ```
-
-### Dipendenze Principali
-
-- `github.com/go-ldap/ldap/v3` - Client LDAP per Active Directory
-- `github.com/prometheus/client_golang` - Metriche Prometheus
-- `github.com/sirupsen/logrus` - Logging strutturato
-- `golang.org/x/crypto/acme/autocert` - Gestione certificati LetsEncrypt
-- `gopkg.in/yaml.v3` - Parser configurazione YAML
-
-## Requisiti di Sistema
-
-### Server AIConnect
-- Rocky Linux 8/9 o RHEL-compatible
-- Go 1.21+ (per compilazione)
-- Accesso LDAP ad Active Directory
-- Porta 443 (HTTPS) e 80 (ACME challenge) accessibili
-- Porta 9090 per metriche Prometheus
-
-### Server Ollama (ciascuno)
-- Python 3.6+
-- Libreria `psutil`
-- Driver NVIDIA (se presente GPU)
-- Porta 11434 accessibile da AIConnect
-
-### Rete
-- Connettività tra AIConnect e server Ollama
-- Connettività tra AIConnect e Active Directory LDAP
-- Connettività tra AIConnect e API OpenAI (se utilizzato)
-- DNS correttamente configurato per dominio LetsEncrypt
-
-## Supporto e Contributi
-
-Per segnalazione bug, richieste di funzionalità o domande tecniche, aprire una issue sul repository GitHub.
-
-Le pull request sono benvenute. Per modifiche sostanziali, aprire prima una issue per discutere le modifiche proposte.
 
 ## Licenza
 
-Questo progetto è distribuito sotto licenza MIT. Vedere file LICENSE per dettagli completi.
+MIT License
+
+## Supporto
+
+Per problemi o domande, aprire una issue su GitHub.
