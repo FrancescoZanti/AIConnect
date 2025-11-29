@@ -9,12 +9,12 @@ import (
 
 // Manager gestisce le metriche Prometheus
 type Manager struct {
-	authAttempts   *prometheus.CounterVec
-	authFailures   *prometheus.CounterVec
-	proxyRequests  *prometheus.CounterVec
-	proxyErrors    *prometheus.CounterVec
-	proxyLatency   *prometheus.HistogramVec
-	backendHealth  *prometheus.GaugeVec
+	authAttempts  *prometheus.CounterVec
+	authFailures  *prometheus.CounterVec
+	proxyRequests *prometheus.CounterVec
+	proxyErrors   *prometheus.CounterVec
+	proxyLatency  *prometheus.HistogramVec
+	backendHealth *prometheus.GaugeVec
 }
 
 // NewManager crea un nuovo manager delle metriche

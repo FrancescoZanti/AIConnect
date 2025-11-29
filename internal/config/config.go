@@ -19,6 +19,7 @@ type Config struct {
 
 	Backends struct {
 		OllamaServers  []string `yaml:"ollama_servers"`
+		VLLMServers    []string `yaml:"vllm_servers"`
 		OpenAIEndpoint string   `yaml:"openai_endpoint"`
 		OpenAIAPIKey   string   `yaml:"openai_api_key"`
 	} `yaml:"backends"`

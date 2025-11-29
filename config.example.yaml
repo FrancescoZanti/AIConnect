@@ -12,6 +12,9 @@ backends:
     - "http://ollama1.example.com:11434"
     - "http://ollama2.example.com:11434"
     - "http://ollama3.example.com:11434"
+  vllm_servers:
+    - "http://vllm1.example.com:8000"
+    - "http://vllm2.example.com:8000"
   openai_endpoint: "https://api.openai.com/v1"
   openai_api_key: "sk-your-openai-api-key-here"
 
