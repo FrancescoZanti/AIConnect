@@ -186,8 +186,8 @@ func (lb *VLLMLoadBalancer) handleServerError(serverURL string, err error) {
 
 // SelectServer seleziona il server migliore usando weighted least-load
 func (lb *VLLMLoadBalancer) SelectServer() (string, error) {
-	lb.mutex.RLock()
-	defer lb.mutex.RUnlock()
+	lb.mutex.Lock()
+	defer lb.mutex.Unlock()
 
 	// Trova server disponibili
 	var availableServers []*ServerMetrics
