@@ -11,22 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ServerMetrics contiene le metriche di carico di un server
-type ServerMetrics struct {
-	URL          string
-	CPUPercent   float64
-	RAMPercent   float64
-	GPUCount     int
-	GPUAvgUtil   float64
-	GPUAvgMemory float64
-	Available    bool
-	LastCheck    time.Time
-	ErrorCount   int
-	TotalWeight  float64 // Carico totale calcolato
-}
-
-// OllamaLoadBalancer gestisce il load balancing tra server Ollama
-type OllamaLoadBalancer struct {
+// VLLMLoadBalancer gestisce il load balancing tra server vLLM
+type VLLMLoadBalancer struct {
 	servers         []string
 	metrics         map[string]*ServerMetrics
 	mutex           sync.RWMutex
@@ -36,9 +22,9 @@ type OllamaLoadBalancer struct {
 	roundRobinIndex int
 }
 
-// NewOllamaLoadBalancer crea un nuovo load balancer
-func NewOllamaLoadBalancer(servers []string, checkInterval int, log *logrus.Logger) *OllamaLoadBalancer {
-	lb := &OllamaLoadBalancer{
+// NewVLLMLoadBalancer crea un nuovo load balancer per vLLM
+func NewVLLMLoadBalancer(servers []string, checkInterval int, log *logrus.Logger) *VLLMLoadBalancer {
+	lb := &VLLMLoadBalancer{
 		servers:         servers,
 		metrics:         make(map[string]*ServerMetrics),
 		log:             log,
@@ -59,7 +45,7 @@ func NewOllamaLoadBalancer(servers []string, checkInterval int, log *logrus.Logg
 }
 
 // Start avvia il monitoraggio periodico dei server
-func (lb *OllamaLoadBalancer) Start() {
+func (lb *VLLMLoadBalancer) Start() {
 	// Controllo iniziale
 	lb.checkAllServers()
 
@@ -71,11 +57,11 @@ func (lb *OllamaLoadBalancer) Start() {
 		}
 	}()
 
-	lb.log.WithField("interval", lb.checkInterval).Info("Load balancer Ollama avviato")
+	lb.log.WithField("interval", lb.checkInterval).Info("Load balancer vLLM avviato")
 }
 
 // checkAllServers controlla lo stato di tutti i server
-func (lb *OllamaLoadBalancer) checkAllServers() {
+func (lb *VLLMLoadBalancer) checkAllServers() {
 	var wg sync.WaitGroup
 
 	for _, server := range lb.servers {
@@ -89,15 +75,17 @@ func (lb *OllamaLoadBalancer) checkAllServers() {
 	wg.Wait()
 }
 
-// checkServer controlla metriche di un singolo server
-func (lb *OllamaLoadBalancer) checkServer(serverURL string) {
-	metricsURL := fmt.Sprintf("%s/metrics", serverURL)
+// checkServer controlla metriche di un singolo server vLLM
+func (lb *VLLMLoadBalancer) checkServer(serverURL string) {
+	// vLLM espone metriche su /metrics in formato Prometheus o /health
+	// Proviamo prima con /health per verificare disponibilità
+	healthURL := fmt.Sprintf("%s/health", serverURL)
 
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
 
-	resp, err := client.Get(metricsURL)
+	resp, err := client.Get(healthURL)
 	if err != nil {
 		lb.handleServerError(serverURL, err)
 		return
@@ -109,56 +97,70 @@ func (lb *OllamaLoadBalancer) checkServer(serverURL string) {
 		return
 	}
 
-	// Parse JSON response
-	var data struct {
-		CPUPercent   float64 `json:"cpu_percent"`
-		RAMPercent   float64 `json:"ram_percent"`
-		GPUCount     int     `json:"gpu_count"`
-		GPUAvgUtil   float64 `json:"gpu_avg_utilization_percent"`
-		GPUAvgMemory float64 `json:"gpu_avg_memory_percent"`
+	// Tenta di ottenere metriche dettagliate da /metrics (formato JSON custom)
+	metricsURL := fmt.Sprintf("%s/metrics", serverURL)
+	metricsResp, err := client.Get(metricsURL)
+	if err == nil && metricsResp.StatusCode == http.StatusOK {
+		defer metricsResp.Body.Close()
+
+		// Parse JSON response (se disponibile)
+		var data struct {
+			CPUPercent   float64 `json:"cpu_percent"`
+			RAMPercent   float64 `json:"ram_percent"`
+			GPUCount     int     `json:"gpu_count"`
+			GPUAvgUtil   float64 `json:"gpu_avg_utilization_percent"`
+			GPUAvgMemory float64 `json:"gpu_avg_memory_percent"`
+		}
+
+		if err := json.NewDecoder(metricsResp.Body).Decode(&data); err == nil {
+			// Aggiorna metriche dettagliate
+			lb.mutex.Lock()
+			metrics := lb.metrics[serverURL]
+			metrics.CPUPercent = data.CPUPercent
+			metrics.RAMPercent = data.RAMPercent
+			metrics.GPUCount = data.GPUCount
+			metrics.GPUAvgUtil = data.GPUAvgUtil
+			metrics.GPUAvgMemory = data.GPUAvgMemory
+
+			// Calcola peso totale: CPU + RAM + (GPU util * 1.5) + (GPU mem * 1.5)
+			gpuWeight := 0.0
+			if data.GPUCount > 0 {
+				gpuWeight = (data.GPUAvgUtil * 1.5) + (data.GPUAvgMemory * 1.5)
+			}
+			metrics.TotalWeight = data.CPUPercent + data.RAMPercent + gpuWeight
+
+			metrics.Available = true
+			metrics.LastCheck = time.Now()
+			metrics.ErrorCount = 0
+			lb.mutex.Unlock()
+
+			lb.log.WithFields(logrus.Fields{
+				"server":    serverURL,
+				"cpu":       data.CPUPercent,
+				"ram":       data.RAMPercent,
+				"gpu_count": data.GPUCount,
+				"gpu_util":  data.GPUAvgUtil,
+				"gpu_mem":   data.GPUAvgMemory,
+				"weight":    metrics.TotalWeight,
+			}).Debug("Metriche server vLLM aggiornate")
+			return
+		}
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		lb.handleServerError(serverURL, err)
-		return
-	}
-
-	// Aggiorna metriche
+	// Fallback: server è disponibile ma senza metriche dettagliate
 	lb.mutex.Lock()
 	defer lb.mutex.Unlock()
 
 	metrics := lb.metrics[serverURL]
-	metrics.CPUPercent = data.CPUPercent
-	metrics.RAMPercent = data.RAMPercent
-	metrics.GPUCount = data.GPUCount
-	metrics.GPUAvgUtil = data.GPUAvgUtil
-	metrics.GPUAvgMemory = data.GPUAvgMemory
-
-	// Calcola peso totale: CPU + RAM + (GPU util * 1.5) + (GPU mem * 1.5)
-	// GPU ha peso maggiore perché più critica per inferenza AI
-	gpuWeight := 0.0
-	if data.GPUCount > 0 {
-		gpuWeight = (data.GPUAvgUtil * 1.5) + (data.GPUAvgMemory * 1.5)
-	}
-	metrics.TotalWeight = data.CPUPercent + data.RAMPercent + gpuWeight
-
 	metrics.Available = true
 	metrics.LastCheck = time.Now()
 	metrics.ErrorCount = 0
 
-	lb.log.WithFields(logrus.Fields{
-		"server":    serverURL,
-		"cpu":       data.CPUPercent,
-		"ram":       data.RAMPercent,
-		"gpu_count": data.GPUCount,
-		"gpu_util":  data.GPUAvgUtil,
-		"gpu_mem":   data.GPUAvgMemory,
-		"weight":    metrics.TotalWeight,
-	}).Debug("Metriche server aggiornate")
+	lb.log.WithField("server", serverURL).Debug("Server vLLM disponibile (senza metriche dettagliate)")
 }
 
 // handleServerError gestisce errori di comunicazione con il server
-func (lb *OllamaLoadBalancer) handleServerError(serverURL string, err error) {
+func (lb *VLLMLoadBalancer) handleServerError(serverURL string, err error) {
 	lb.mutex.Lock()
 	defer lb.mutex.Unlock()
 
@@ -172,18 +174,18 @@ func (lb *OllamaLoadBalancer) handleServerError(serverURL string, err error) {
 			"server":      serverURL,
 			"error_count": metrics.ErrorCount,
 			"error":       err.Error(),
-		}).Warn("Server marcato non disponibile")
+		}).Warn("Server vLLM marcato non disponibile")
 	} else {
 		lb.log.WithFields(logrus.Fields{
 			"server":      serverURL,
 			"error_count": metrics.ErrorCount,
 			"error":       err.Error(),
-		}).Debug("Errore comunicazione server")
+		}).Debug("Errore comunicazione server vLLM")
 	}
 }
 
 // SelectServer seleziona il server migliore usando weighted least-load
-func (lb *OllamaLoadBalancer) SelectServer() (string, error) {
+func (lb *VLLMLoadBalancer) SelectServer() (string, error) {
 	lb.mutex.RLock()
 	defer lb.mutex.RUnlock()
 
@@ -196,13 +198,13 @@ func (lb *OllamaLoadBalancer) SelectServer() (string, error) {
 	}
 
 	if len(availableServers) == 0 {
-		return "", fmt.Errorf("nessun server Ollama disponibile")
+		return "", fmt.Errorf("nessun server vLLM disponibile")
 	}
 
 	// Se abbiamo metriche valide, usa weighted least-load
 	var hasMetrics bool
 	for _, m := range availableServers {
-		if !m.LastCheck.IsZero() {
+		if !m.LastCheck.IsZero() && m.TotalWeight > 0 {
 			hasMetrics = true
 			break
 		}
@@ -214,7 +216,7 @@ func (lb *OllamaLoadBalancer) SelectServer() (string, error) {
 		var selectedServer string
 
 		for _, m := range availableServers {
-			if !m.LastCheck.IsZero() && m.TotalWeight < minWeight {
+			if !m.LastCheck.IsZero() && m.TotalWeight > 0 && m.TotalWeight < minWeight {
 				minWeight = m.TotalWeight
 				selectedServer = m.URL
 			}
@@ -224,7 +226,7 @@ func (lb *OllamaLoadBalancer) SelectServer() (string, error) {
 			lb.log.WithFields(logrus.Fields{
 				"server": selectedServer,
 				"weight": minWeight,
-			}).Debug("Server selezionato (weighted least-load)")
+			}).Debug("Server vLLM selezionato (weighted least-load)")
 			return selectedServer, nil
 		}
 	}
@@ -233,12 +235,12 @@ func (lb *OllamaLoadBalancer) SelectServer() (string, error) {
 	selected := availableServers[lb.roundRobinIndex%len(availableServers)]
 	lb.roundRobinIndex++
 
-	lb.log.WithField("server", selected.URL).Debug("Server selezionato (round-robin fallback)")
+	lb.log.WithField("server", selected.URL).Debug("Server vLLM selezionato (round-robin fallback)")
 	return selected.URL, nil
 }
 
 // GetMetrics restituisce le metriche correnti (per debugging/monitoring)
-func (lb *OllamaLoadBalancer) GetMetrics() map[string]*ServerMetrics {
+func (lb *VLLMLoadBalancer) GetMetrics() map[string]*ServerMetrics {
 	lb.mutex.RLock()
 	defer lb.mutex.RUnlock()
 

@@ -57,8 +57,16 @@ func main() {
 	)
 	ollamaLB.Start()
 
+	// Initialize vLLM load balancer
+	vllmLB := loadbalancer.NewVLLMLoadBalancer(
+		cfg.Backends.VLLMServers,
+		cfg.Monitoring.HealthCheckInterval,
+		log,
+	)
+	vllmLB.Start()
+
 	// Create proxy handler
-	proxyHandler := proxy.NewHandler(cfg, log, ollamaLB, metricsManager)
+	proxyHandler := proxy.NewHandler(cfg, log, ollamaLB, vllmLB, metricsManager)
 
 	// Wrap with authentication middleware
 	authHandler := auth.LDAPAuthMiddleware(cfg, log)(proxyHandler)
@@ -66,6 +74,7 @@ func main() {
 	// Setup HTTP mux
 	mux := http.NewServeMux()
 	mux.Handle("/ollama/", authHandler)
+	mux.Handle("/vllm/", authHandler)
 	mux.Handle("/openai/", authHandler)
 
 	// Health check endpoint (unauthenticated)
