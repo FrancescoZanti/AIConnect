@@ -43,9 +43,5 @@ config.yaml
 coverage.out
 *.test
 
-# Container files (non necessari nel context)
-Dockerfile
-Containerfile
-
 # GitHub
 .github/

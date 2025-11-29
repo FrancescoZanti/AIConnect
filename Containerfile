@@ -40,7 +40,7 @@ LABEL org.opencontainers.image.source="https://github.com/fzanti/aiconnect"
 LABEL org.opencontainers.image.vendor="AIConnect"
 
 # Installa certificati CA per connessioni TLS
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata wget
 
 # Crea utente non-root per sicurezza
 RUN addgroup -g 1000 aiconnect && \

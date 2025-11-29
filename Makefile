@@ -47,7 +47,7 @@ fmt:
 vet:
 	$(GOCMD) vet ./...
 
-# Container targets (compatibili con Podman e Docker)
+# Container targets (compatibile con Podman e Docker)
 container-build:
 	$(CONTAINER_ENGINE) build -t $(IMAGE_NAME):$(IMAGE_TAG) -f Containerfile .
 
