@@ -188,21 +188,11 @@ func main() {
 	}
 }
 
-// getLocalHost returns the local host IP address
+// getLocalHost returns the local host IP address, consistent with mDNS advertisement
 func getLocalHost() string {
-	// Try to get the preferred outbound IP
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return "127.0.0.1"
+	ips := mdns.GetLocalIPs()
+	if len(ips) > 0 {
+		return ips[0]
 	}
-
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
-			}
-		}
-	}
-
 	return "127.0.0.1"
 }
