@@ -145,6 +145,19 @@ func getLocalIPs() ([]net.IP, error) {
 	return ips, nil
 }
 
+// GetLocalIPs returns all local non-loopback IPv4 addresses as strings
+func GetLocalIPs() []string {
+	ips, err := getLocalIPs()
+	if err != nil {
+		return nil
+	}
+	result := make([]string, 0, len(ips))
+	for _, ip := range ips {
+		result = append(result, ip.String())
+	}
+	return result
+}
+
 // getInterfaces returns network interfaces for mDNS registration
 func getInterfaces(ips []net.IP) []net.Interface {
 	if len(ips) == 0 {
