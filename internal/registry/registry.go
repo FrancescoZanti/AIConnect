@@ -95,7 +95,11 @@ func (r *Registry) emit(eventType EventType, node *Node) {
 		Node:      node,
 		Timestamp: time.Now(),
 	}
-	for _, cb := range r.callbacks {
+	r.mutex.RLock()
+	callbacks := make([]EventCallback, len(r.callbacks))
+	copy(callbacks, r.callbacks)
+	r.mutex.RUnlock()
+	for _, cb := range callbacks {
 		go func(callback EventCallback) {
 			defer func() {
 				if rec := recover(); rec != nil {
