@@ -3,6 +3,7 @@ package mdns
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -200,6 +201,20 @@ func (d *Discovery) processEntry(serviceType string, entry *zeroconf.ServiceEntr
 	if host == "" {
 		d.log.WithField("instance", entry.Instance).Warn("No address found for discovered service")
 		return
+	}
+
+	// Validate that the host is a valid IP address or resolvable hostname
+	if net.ParseIP(host) == nil {
+		// Not a valid IP, check if it's a resolvable hostname
+		_, err := net.LookupHost(host)
+		if err != nil {
+			d.log.WithFields(logrus.Fields{
+				"instance": entry.Instance,
+				"host":     host,
+				"error":    err,
+			}).Warn("Unable to resolve hostname for discovered service")
+			return
+		}
 	}
 
 	node := &registry.Node{

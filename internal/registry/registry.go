@@ -96,7 +96,15 @@ func (r *Registry) emit(eventType EventType, node *Node) {
 		Timestamp: time.Now(),
 	}
 	for _, cb := range r.callbacks {
-		go cb(event)
+		go func(callback EventCallback) {
+			defer func() {
+				if rec := recover(); rec != nil {
+					// Log panic in callback but don't crash
+					// Callback error is silently ignored to prevent application crash
+				}
+			}()
+			callback(event)
+		}(cb)
 	}
 }
 

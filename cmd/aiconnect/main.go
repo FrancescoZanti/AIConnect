@@ -88,8 +88,8 @@ func main() {
 		// Initialize health checker for discovered nodes
 		healthConfig := &mdns.HealthCheckerConfig{
 			CheckInterval: time.Duration(cfg.Monitoring.HealthCheckInterval) * time.Second,
-			CheckTimeout:  2 * time.Second,
-			MaxErrors:     3,
+			CheckTimeout:  mdns.DefaultHealthCheckTimeout,
+			MaxErrors:     mdns.DefaultMaxHealthErrors,
 		}
 		healthChecker = mdns.NewHealthChecker(healthConfig, nodeRegistry, log)
 		healthChecker.Start()
