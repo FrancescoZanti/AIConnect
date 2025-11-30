@@ -30,3 +30,20 @@ monitoring:
 logging:
   level: "info"  # debug, info, warn, error
   format: "json"  # json o text
+
+# mDNS configuration for MatePro compatibility
+# Note: When mdns.discovery_enabled is true, discovered nodes will supplement
+# the statically configured backends above. Both static and discovered backends
+# will be used for routing and load balancing unless otherwise specified.
+mdns:
+  enabled: true                      # Enable mDNS advertisement of AIConnect
+  service_name: "AIConnect Orchestrator"
+  version: "1.0.0"
+  capabilities: "ollama,vllm,openai"
+  discovery_enabled: true            # Enable auto-discovery of LLM backends
+  discovery_interval: 30             # Seconds between discovery scans
+  discovery_timeout: 5               # Timeout for each discovery scan
+  service_types:                     # mDNS service types to discover
+    - "_ollama._tcp"
+    - "_openai._tcp"
+    - "_vllm._tcp"
