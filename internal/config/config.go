@@ -39,6 +39,17 @@ type Config struct {
 		Level  string `yaml:"level"`
 		Format string `yaml:"format"`
 	} `yaml:"logging"`
+
+	MDNS struct {
+		Enabled           bool     `yaml:"enabled"`
+		ServiceName       string   `yaml:"service_name"`
+		Version           string   `yaml:"version"`
+		Capabilities      string   `yaml:"capabilities"`
+		DiscoveryEnabled  bool     `yaml:"discovery_enabled"`
+		DiscoveryInterval int      `yaml:"discovery_interval"`
+		DiscoveryTimeout  int      `yaml:"discovery_timeout"`
+		ServiceTypes      []string `yaml:"service_types"`
+	} `yaml:"mdns"`
 }
 
 // Load carica la configurazione dal file YAML specificato
@@ -68,6 +79,26 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Logging.Format == "" {
 		cfg.Logging.Format = "json"
+	}
+
+	// mDNS defaults
+	if cfg.MDNS.ServiceName == "" {
+		cfg.MDNS.ServiceName = "AIConnect Orchestrator"
+	}
+	if cfg.MDNS.Version == "" {
+		cfg.MDNS.Version = "1.0.0"
+	}
+	if cfg.MDNS.Capabilities == "" {
+		cfg.MDNS.Capabilities = "ollama,vllm,openai"
+	}
+	if cfg.MDNS.DiscoveryInterval == 0 {
+		cfg.MDNS.DiscoveryInterval = 30
+	}
+	if cfg.MDNS.DiscoveryTimeout == 0 {
+		cfg.MDNS.DiscoveryTimeout = 5
+	}
+	if len(cfg.MDNS.ServiceTypes) == 0 {
+		cfg.MDNS.ServiceTypes = []string{"_ollama._tcp", "_openai._tcp", "_vllm._tcp"}
 	}
 
 	return &cfg, nil

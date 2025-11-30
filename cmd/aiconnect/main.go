@@ -2,14 +2,18 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/fzanti/aiconnect/internal/auth"
 	"github.com/fzanti/aiconnect/internal/config"
 	"github.com/fzanti/aiconnect/internal/loadbalancer"
+	"github.com/fzanti/aiconnect/internal/mdns"
 	"github.com/fzanti/aiconnect/internal/metrics"
 	"github.com/fzanti/aiconnect/internal/proxy"
+	"github.com/fzanti/aiconnect/internal/registry"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/acme/autocert"
@@ -45,6 +49,63 @@ func main() {
 	}
 
 	log.Info("AIConnect in avvio...")
+
+	// Initialize node registry for mDNS discovery
+	nodeRegistry := registry.NewRegistry()
+
+	// Initialize mDNS advertiser if enabled
+	var mdnsAdvertiser *mdns.Advertiser
+	if cfg.MDNS.Enabled {
+		advertiserConfig := &mdns.AdvertiserConfig{
+			ServiceName:  cfg.MDNS.ServiceName,
+			Port:         cfg.HTTPS.Port,
+			Domain:       "local.",
+			Version:      cfg.MDNS.Version,
+			Capabilities: cfg.MDNS.Capabilities,
+		}
+		mdnsAdvertiser = mdns.NewAdvertiser(advertiserConfig, log)
+		if err := mdnsAdvertiser.Start(); err != nil {
+			log.WithError(err).Warn("Failed to start mDNS advertiser")
+		} else {
+			defer mdnsAdvertiser.Stop()
+		}
+	}
+
+	// Initialize mDNS discovery if enabled
+	var mdnsDiscovery *mdns.Discovery
+	var healthChecker *mdns.HealthChecker
+	if cfg.MDNS.DiscoveryEnabled {
+		discoveryConfig := &mdns.DiscoveryConfig{
+			ServiceTypes:      cfg.MDNS.ServiceTypes,
+			Domain:            "local",
+			DiscoveryInterval: time.Duration(cfg.MDNS.DiscoveryInterval) * time.Second,
+			DiscoveryTimeout:  time.Duration(cfg.MDNS.DiscoveryTimeout) * time.Second,
+		}
+		mdnsDiscovery = mdns.NewDiscovery(discoveryConfig, nodeRegistry, log)
+		mdnsDiscovery.Start()
+		defer mdnsDiscovery.Stop()
+
+		// Initialize health checker for discovered nodes
+		healthConfig := &mdns.HealthCheckerConfig{
+			CheckInterval: time.Duration(cfg.Monitoring.HealthCheckInterval) * time.Second,
+			CheckTimeout:  2 * time.Second,
+			MaxErrors:     3,
+		}
+		healthChecker = mdns.NewHealthChecker(healthConfig, nodeRegistry, log)
+		healthChecker.Start()
+		defer healthChecker.Stop()
+
+		// Register event callback for logging
+		nodeRegistry.OnEvent(func(e registry.Event) {
+			log.WithFields(logrus.Fields{
+				"event": e.Type,
+				"node":  e.Node.Name,
+				"host":  e.Node.Host,
+				"port":  e.Node.Port,
+				"type":  e.Node.Type,
+			}).Info("Registry event")
+		})
+	}
 
 	// Initialize metrics manager
 	metricsManager := metrics.NewManager()
@@ -83,6 +144,11 @@ func main() {
 		fmt.Fprintln(w, "OK")
 	})
 
+	// Nodes endpoint for topology discovery (unauthenticated for MatePro compatibility)
+	// Get local host for the response
+	localHost := getLocalHost()
+	mux.HandleFunc("/internal/nodes", mdns.NodesHandler(nodeRegistry, localHost, cfg.HTTPS.Port))
+
 	// Start metrics server on separate port
 	go func() {
 		metricsMux := http.NewServeMux()
@@ -120,4 +186,23 @@ func main() {
 	if err := server.ListenAndServeTLS("", ""); err != nil {
 		log.WithError(err).Fatal("Errore server HTTPS")
 	}
+}
+
+// getLocalHost returns the local host IP address
+func getLocalHost() string {
+	// Try to get the preferred outbound IP
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "127.0.0.1"
+	}
+
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+
+	return "127.0.0.1"
 }
