@@ -81,7 +81,7 @@ func main() {
 	if cfg.MDNS.DiscoveryEnabled {
 		discoveryConfig := &mdns.DiscoveryConfig{
 			ServiceTypes:      cfg.MDNS.ServiceTypes,
-			Domain:            "local",
+			Domain:            "local.",
 			DiscoveryInterval: time.Duration(cfg.MDNS.DiscoveryInterval) * time.Second,
 			DiscoveryTimeout:  time.Duration(cfg.MDNS.DiscoveryTimeout) * time.Second,
 		}
