@@ -66,10 +66,14 @@ func main() {
 		mdnsAdvertiser = mdns.NewAdvertiser(advertiserConfig, log)
 		if err := mdnsAdvertiser.Start(); err != nil {
 			log.WithError(err).Warn("Failed to start mDNS advertiser")
-		} else {
-			defer mdnsAdvertiser.Stop()
 		}
 	}
+	// Always defer Stop for mdnsAdvertiser if initialized, regardless of Start() success
+	defer func() {
+		if mdnsAdvertiser != nil {
+			mdnsAdvertiser.Stop()
+		}
+	}()
 
 	// Initialize mDNS discovery if enabled
 	var mdnsDiscovery *mdns.Discovery
