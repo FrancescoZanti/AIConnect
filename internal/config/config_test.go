@@ -169,3 +169,84 @@ https:
 		}
 	}
 }
+
+func TestLoad_CustomSSLCertificates(t *testing.T) {
+	// Create a temporary config file with custom SSL certificates
+	content := `
+ad:
+  enabled: false
+
+backends:
+  ollama_servers:
+    - "http://ollama1:11434"
+  openai_endpoint: "https://api.openai.com/v1"
+  openai_api_key: "test-key"
+
+https:
+  domain: "test.example.com"
+  cache_dir: "/tmp/test-cache"
+  port: 443
+  cert_file: "/etc/ssl/certs/test.crt"
+  key_file: "/etc/ssl/private/test.key"
+`
+	tmpFile := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create temp config file: %v", err)
+	}
+
+	cfg, err := Load(tmpFile)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Check cert_file and key_file are loaded correctly
+	if cfg.HTTPS.CertFile != "/etc/ssl/certs/test.crt" {
+		t.Errorf("Expected CertFile to be '/etc/ssl/certs/test.crt', got %q", cfg.HTTPS.CertFile)
+	}
+	if cfg.HTTPS.KeyFile != "/etc/ssl/private/test.key" {
+		t.Errorf("Expected KeyFile to be '/etc/ssl/private/test.key', got %q", cfg.HTTPS.KeyFile)
+	}
+}
+
+func TestLoad_AutocertWithoutCustomCerts(t *testing.T) {
+	// Create a temporary config file without custom SSL certificates (autocert mode)
+	content := `
+ad:
+  enabled: false
+
+backends:
+  ollama_servers:
+    - "http://ollama1:11434"
+  openai_endpoint: "https://api.openai.com/v1"
+  openai_api_key: "test-key"
+
+https:
+  domain: "test.example.com"
+  cache_dir: "/tmp/test-cache"
+  port: 443
+`
+	tmpFile := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create temp config file: %v", err)
+	}
+
+	cfg, err := Load(tmpFile)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Check cert_file and key_file are empty (autocert mode)
+	if cfg.HTTPS.CertFile != "" {
+		t.Errorf("Expected CertFile to be empty, got %q", cfg.HTTPS.CertFile)
+	}
+	if cfg.HTTPS.KeyFile != "" {
+		t.Errorf("Expected KeyFile to be empty, got %q", cfg.HTTPS.KeyFile)
+	}
+	// Verify domain and cache_dir are still set for autocert
+	if cfg.HTTPS.Domain != "test.example.com" {
+		t.Errorf("Expected Domain to be 'test.example.com', got %q", cfg.HTTPS.Domain)
+	}
+	if cfg.HTTPS.CacheDir != "/tmp/test-cache" {
+		t.Errorf("Expected CacheDir to be '/tmp/test-cache', got %q", cfg.HTTPS.CacheDir)
+	}
+}

@@ -30,6 +30,8 @@ type Config struct {
 		Domain   string `yaml:"domain"`
 		CacheDir string `yaml:"cache_dir"`
 		Port     int    `yaml:"port"`
+		CertFile string `yaml:"cert_file"`
+		KeyFile  string `yaml:"key_file"`
 	} `yaml:"https"`
 
 	Monitoring struct {
