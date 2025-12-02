@@ -68,7 +68,7 @@ func NewHealthChecker(config *HealthCheckerConfig, reg *registry.Registry, log *
 		config:   config,
 		registry: reg,
 		log:      log,
-		client: &http.Client{
+		client:   &http.Client{
 			// No timeout here - use context timeout instead
 		},
 		ctx:    ctx,

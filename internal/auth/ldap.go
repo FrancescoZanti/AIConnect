@@ -11,10 +11,51 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// isPublicPath controlla se il path richiesto è nella lista dei path pubblici
+func isPublicPath(path string, publicPaths []string) bool {
+	for _, publicPath := range publicPaths {
+		// Supporta pattern con wildcard finale (es. "/ollama/*")
+		if strings.HasSuffix(publicPath, "/*") {
+			// Rimuove "/*" per ottenere il prefisso base (es. "/ollama/")
+			prefix := strings.TrimSuffix(publicPath, "*")
+			// Il path deve iniziare esattamente con il prefisso (incluso il /)
+			// Questo garantisce che "/ollama/*" NON matchi "/ollama-admin/"
+			if strings.HasPrefix(path, prefix) {
+				return true
+			}
+		} else if strings.HasSuffix(publicPath, "/") {
+			// Path che termina con "/" matcha tutti i subpath
+			// Deve matchare esattamente il prefisso incluso il /
+			// Questo garantisce che "/api/" NON matchi "/api-admin/"
+			if strings.HasPrefix(path, publicPath) {
+				return true
+			}
+		} else if path == publicPath {
+			// Match esatto
+			return true
+		}
+	}
+	return false
+}
+
 // LDAPAuthMiddleware gestisce l'autenticazione LDAP e l'autorizzazione basata su gruppi AD
 func LDAPAuthMiddleware(cfg *config.Config, log *logrus.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Se l'autenticazione AD non è abilitata, passa direttamente
+			if cfg.AD.Enabled != nil && !*cfg.AD.Enabled {
+				log.WithField("path", r.URL.Path).Debug("Autenticazione AD disabilitata, accesso consentito")
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Controlla se il path è pubblico (accessibile senza autenticazione)
+			if isPublicPath(r.URL.Path, cfg.AD.PublicPaths) {
+				log.WithField("path", r.URL.Path).Debug("Path pubblico, accesso senza autenticazione")
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			// Estrai credenziali dall'header Authorization
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {

@@ -1,4 +1,5 @@
 ad:
+  enabled: true  # Set to false to disable LDAP/AD authentication completely
   ldap_url: "ldap://ad.example.com:389"
   bind_dn: "CN=service-account,OU=ServiceAccounts,DC=example,DC=com"
   bind_password: "your-service-account-password"
@@ -6,6 +7,11 @@ ad:
   allowed_groups:
     - "CN=AI-Users,OU=Groups,DC=example,DC=com"
     - "CN=Developers,OU=Groups,DC=example,DC=com"
+  # Paths that can be accessed without authentication (when AD is enabled)
+  # Supports exact match, prefix with trailing slash, or wildcard with /*
+  public_paths:
+    # - "/ollama/*"      # All paths under /ollama/ are public
+    # - "/health"        # Exact match for /health endpoint
 
 backends:
   ollama_servers:
