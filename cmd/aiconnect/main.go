@@ -165,29 +165,45 @@ func main() {
 		}
 	}()
 
-	// Configure autocert manager for LetsEncrypt
-	certManager := autocert.Manager{
-		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(cfg.HTTPS.Domain),
-		Cache:      autocert.DirCache(cfg.HTTPS.CacheDir),
-	}
-
 	// Configure HTTPS server
 	httpsAddr := fmt.Sprintf(":%d", cfg.HTTPS.Port)
 	server := &http.Server{
-		Addr:      httpsAddr,
-		Handler:   mux,
-		TLSConfig: certManager.TLSConfig(),
+		Addr:    httpsAddr,
+		Handler: mux,
 	}
 
-	log.WithFields(logrus.Fields{
-		"address": httpsAddr,
-		"domain":  cfg.HTTPS.Domain,
-	}).Info("Server HTTPS in avvio")
+	// Check if user provided custom SSL certificates
+	useCustomCerts := cfg.HTTPS.CertFile != "" && cfg.HTTPS.KeyFile != ""
 
-	// Start HTTPS server
-	if err := server.ListenAndServeTLS("", ""); err != nil {
-		log.WithError(err).Fatal("Errore server HTTPS")
+	if useCustomCerts {
+		log.WithFields(logrus.Fields{
+			"address":   httpsAddr,
+			"cert_file": cfg.HTTPS.CertFile,
+			"key_file":  cfg.HTTPS.KeyFile,
+		}).Info("Server HTTPS in avvio con certificati custom")
+
+		// Start HTTPS server with user-provided certificates
+		if err := server.ListenAndServeTLS(cfg.HTTPS.CertFile, cfg.HTTPS.KeyFile); err != nil {
+			log.WithError(err).Fatal("Errore server HTTPS")
+		}
+	} else {
+		// Configure autocert manager for LetsEncrypt
+		certManager := autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist(cfg.HTTPS.Domain),
+			Cache:      autocert.DirCache(cfg.HTTPS.CacheDir),
+		}
+		server.TLSConfig = certManager.TLSConfig()
+
+		log.WithFields(logrus.Fields{
+			"address": httpsAddr,
+			"domain":  cfg.HTTPS.Domain,
+		}).Info("Server HTTPS in avvio con autocert LetsEncrypt")
+
+		// Start HTTPS server with autocert
+		if err := server.ListenAndServeTLS("", ""); err != nil {
+			log.WithError(err).Fatal("Errore server HTTPS")
+		}
 	}
 }
 
