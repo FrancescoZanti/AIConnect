@@ -10,7 +10,7 @@ import (
 // Config rappresenta la configurazione completa dell'applicazione
 type Config struct {
 	AD struct {
-		Enabled       bool     `yaml:"enabled"`
+		Enabled       *bool    `yaml:"enabled"`
 		LDAPURL       string   `yaml:"ldap_url"`
 		BindDN        string   `yaml:"bind_dn"`
 		BindPassword  string   `yaml:"bind_password"`
@@ -67,6 +67,11 @@ func Load(path string) (*Config, error) {
 	}
 
 	// Valori di default
+	// AD enabled defaults to true for backward compatibility
+	if cfg.AD.Enabled == nil {
+		defaultEnabled := true
+		cfg.AD.Enabled = &defaultEnabled
+	}
 	if cfg.HTTPS.Port == 0 {
 		cfg.HTTPS.Port = 443
 	}

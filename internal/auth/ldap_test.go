@@ -9,6 +9,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Helper function to create bool pointer
+func boolPtr(b bool) *bool {
+	return &b
+}
+
 func TestIsPublicPath(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -47,6 +52,12 @@ func TestIsPublicPath(t *testing.T) {
 			expected:    false,
 		},
 		{
+			name:        "wildcard should not match similar prefix",
+			path:        "/ollama-admin/sensitive",
+			publicPaths: []string{"/ollama/*"},
+			expected:    false,
+		},
+		{
 			name:        "prefix with trailing slash",
 			path:        "/vllm/models",
 			publicPaths: []string{"/vllm/"},
@@ -56,6 +67,12 @@ func TestIsPublicPath(t *testing.T) {
 			name:        "prefix with trailing slash - no match",
 			path:        "/openai/models",
 			publicPaths: []string{"/vllm/"},
+			expected:    false,
+		},
+		{
+			name:        "prefix should not match similar prefix",
+			path:        "/api-admin/sensitive",
+			publicPaths: []string{"/api/"},
 			expected:    false,
 		},
 		{
@@ -96,7 +113,7 @@ func TestIsPublicPath(t *testing.T) {
 
 func TestLDAPAuthMiddleware_ADDisabled(t *testing.T) {
 	cfg := &config.Config{}
-	cfg.AD.Enabled = false
+	cfg.AD.Enabled = boolPtr(false)
 
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
@@ -123,7 +140,7 @@ func TestLDAPAuthMiddleware_ADDisabled(t *testing.T) {
 
 func TestLDAPAuthMiddleware_PublicPath(t *testing.T) {
 	cfg := &config.Config{}
-	cfg.AD.Enabled = true
+	cfg.AD.Enabled = boolPtr(true)
 	cfg.AD.PublicPaths = []string{"/ollama/*", "/health"}
 
 	log := logrus.New()
@@ -157,6 +174,11 @@ func TestLDAPAuthMiddleware_PublicPath(t *testing.T) {
 			path:         "/openai/api/generate",
 			expectedCode: http.StatusUnauthorized,
 		},
+		{
+			name:         "similar prefix should be protected",
+			path:         "/ollama-admin/sensitive",
+			expectedCode: http.StatusUnauthorized,
+		},
 	}
 
 	for _, tt := range tests {
@@ -175,7 +197,7 @@ func TestLDAPAuthMiddleware_PublicPath(t *testing.T) {
 
 func TestLDAPAuthMiddleware_ADEnabled_NoAuth(t *testing.T) {
 	cfg := &config.Config{}
-	cfg.AD.Enabled = true
+	cfg.AD.Enabled = boolPtr(true)
 	cfg.AD.PublicPaths = []string{} // No public paths
 
 	log := logrus.New()
@@ -203,7 +225,7 @@ func TestLDAPAuthMiddleware_ADEnabled_NoAuth(t *testing.T) {
 
 func TestLDAPAuthMiddleware_InvalidAuthHeader(t *testing.T) {
 	cfg := &config.Config{}
-	cfg.AD.Enabled = true
+	cfg.AD.Enabled = boolPtr(true)
 	cfg.AD.PublicPaths = []string{}
 
 	log := logrus.New()
@@ -253,5 +275,34 @@ func TestLDAPAuthMiddleware_InvalidAuthHeader(t *testing.T) {
 				t.Errorf("Expected status %d, got %d", tt.expectedCode, rr.Code)
 			}
 		})
+	}
+}
+
+func TestLDAPAuthMiddleware_ADEnabledNilPointer(t *testing.T) {
+	// Test backward compatibility: when Enabled is nil, should default to true (require auth)
+	cfg := &config.Config{}
+	cfg.AD.Enabled = nil // Not explicitly set
+	cfg.AD.PublicPaths = []string{}
+
+	log := logrus.New()
+	log.SetLevel(logrus.DebugLevel)
+
+	// Create a test handler that returns 200 OK
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Wrap with auth middleware
+	handler := LDAPAuthMiddleware(cfg, log)(testHandler)
+
+	// Create a request without authentication
+	req := httptest.NewRequest("GET", "/ollama/api/generate", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	// Should return Unauthorized because when Enabled is nil, auth is required (default behavior)
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401, got %d", rr.Code)
 	}
 }
