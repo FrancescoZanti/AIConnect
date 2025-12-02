@@ -172,10 +172,25 @@ func main() {
 		Handler: mux,
 	}
 
-	// Check if user provided custom SSL certificates
-	useCustomCerts := cfg.HTTPS.CertFile != "" && cfg.HTTPS.KeyFile != ""
+	// Validate SSL certificate configuration
+	hasCertFile := cfg.HTTPS.CertFile != ""
+	hasKeyFile := cfg.HTTPS.KeyFile != ""
+
+	if hasCertFile != hasKeyFile {
+		log.Fatal("Configurazione SSL non valida: cert_file e key_file devono essere entrambi specificati o entrambi omessi")
+	}
+
+	useCustomCerts := hasCertFile && hasKeyFile
 
 	if useCustomCerts {
+		// Verify certificate files exist and are readable
+		if _, err := os.Stat(cfg.HTTPS.CertFile); os.IsNotExist(err) {
+			log.WithField("cert_file", cfg.HTTPS.CertFile).Fatal("File certificato SSL non trovato")
+		}
+		if _, err := os.Stat(cfg.HTTPS.KeyFile); os.IsNotExist(err) {
+			log.WithField("key_file", cfg.HTTPS.KeyFile).Fatal("File chiave SSL non trovato")
+		}
+
 		log.WithFields(logrus.Fields{
 			"address":   httpsAddr,
 			"cert_file": cfg.HTTPS.CertFile,
