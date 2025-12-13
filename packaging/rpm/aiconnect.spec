@@ -3,6 +3,11 @@ Version:        %{?tagver}%{!?tagver:0.0.0}
 Release:        1%{?dist}
 Summary:        Reverse proxy per AI backends con autenticazione AD
 
+# Il binario viene costruito con "-s -w" (stripped). Su Fedora/RHEL questo può portare
+# alla creazione di un pacchetto debugsource vuoto e quindi a un errore di build.
+# Disabilitiamo la generazione dei pacchetti debuginfo/debugsource per rendere la CI stabile.
+%global debug_package %{nil}
+
 License:        Proprietary
 URL:            https://github.com/fzanti/aiconnect
 Source0:        %{name}-%{version}.tar.gz

@@ -93,10 +93,8 @@ jobs:
 
           if [ "${{ matrix.distro }}" = "fedora" ]; then
             IMAGE="fedora:latest"
-            PKG_INSTALL="dnf -y install"
           else
             IMAGE="registry.access.redhat.com/ubi10/ubi"
-            PKG_INSTALL="microdnf -y install"
           fi
 
           docker run --rm -t \
@@ -105,7 +103,16 @@ jobs:
             "${IMAGE}" \
             bash -lc "\
               set -euo pipefail;\
-              ${PKG_INSTALL} rpm-build golang git shadow-utils;\
+              if command -v microdnf >/dev/null 2>&1; then\
+                microdnf -y install rpm-build golang git shadow-utils;\
+              elif command -v dnf >/dev/null 2>&1; then\
+                dnf -y install rpm-build golang git shadow-utils;\
+              elif command -v yum >/dev/null 2>&1; then\
+                yum -y install rpm-build golang git shadow-utils;\
+              else\
+                echo 'No supported package manager found (microdnf/dnf/yum)' >&2;\
+                exit 1;\
+              fi;\
               TOPDIR=\"/tmp/rpmbuild\";\
               mkdir -p \"\$TOPDIR\"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS};\
               cp -a \"${SRC_TARBALL}\" \"\$TOPDIR/SOURCES/aiconnect-${VERSION}.tar.gz\";\
