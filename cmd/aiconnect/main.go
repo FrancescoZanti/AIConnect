@@ -1,9 +1,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/fzanti/aiconnect/internal/auth"
@@ -19,20 +21,64 @@ import (
 )
 
 func main() {
+	configPathFlag := flag.String("config", "", "Percorso file configurazione YAML")
+	initFlag := flag.Bool("init", false, "Avvia il wizard di configurazione e termina")
+	forceFlag := flag.Bool("force", false, "Forza sovrascrittura config nel wizard")
+	flag.Parse()
+
 	// Setup logger
 	log := logrus.New()
 
 	// Get config path from environment or default
-	configPath := os.Getenv("AICONNECT_CONFIG")
+	configPath := strings.TrimSpace(*configPathFlag)
+	if configPath == "" {
+		configPath = os.Getenv("AICONNECT_CONFIG")
+	}
 	if configPath == "" {
 		configPath = "/etc/aiconnect/config.yaml"
 	}
 
-	// Load configuration
+	if *initFlag {
+		_, err := config.RunWizard(config.WizardOptions{ConfigPath: configPath, Force: *forceFlag})
+		if err != nil {
+			log.WithError(err).Fatal("Wizard fallito")
+		}
+		return
+	}
+
+	// Load configuration (con wizard se manca o non è valida)
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		log.WithError(err).Fatal("Impossibile caricare configurazione")
+		if isInteractiveStdin() {
+			log.WithError(err).Warn("Configurazione non caricabile, avvio wizard")
+			cfg, err = config.RunWizard(config.WizardOptions{ConfigPath: configPath, Force: false})
+			if err != nil {
+				log.WithError(err).Fatal("Impossibile creare configurazione")
+			}
+		} else {
+			log.WithError(err).Fatalf("Impossibile caricare configurazione. Esegui: aiconnect --init --config %s", configPath)
+		}
 	}
+	if err := config.Validate(cfg); err != nil {
+		if isInteractiveStdin() {
+			log.WithError(err).Warn("Configurazione non valida, avvio wizard")
+			cfg, err = config.RunWizard(config.WizardOptions{ConfigPath: configPath, Force: true})
+			if err != nil {
+				log.WithError(err).Fatal("Impossibile creare configurazione")
+			}
+		} else {
+			log.WithError(err).Fatalf("Configurazione non valida. Esegui: aiconnect --init --config %s", configPath)
+		}
+	}
+
+}
+
+func isInteractiveStdin() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
 
 	// Configure logger based on config
 	level, err := logrus.ParseLevel(cfg.Logging.Level)

@@ -161,3 +161,51 @@ jobs:
             dist/**/*.rpm
             dist/**/*.tar.gz
             dist/SHA256SUMS.txt
+
+  copr:
+    name: Submit build to COPR
+    runs-on: ubuntu-latest
+    needs: [source, rpm]
+    container:
+      image: fedora:latest
+    steps:
+      - name: Download SRPM artifact (from Fedora build)
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm-fedora
+          path: dist
+
+      - name: Install copr-cli
+        shell: bash
+        run: |
+          set -euo pipefail
+          dnf -y install copr-cli
+
+      - name: Configure COPR credentials
+        shell: bash
+        env:
+          COPR_CONFIG: ${{ secrets['COPR_CONFIG'] }}
+        run: |
+          set -euo pipefail
+          if [ -z "${COPR_CONFIG:-}" ]; then
+            echo "Missing required secret COPR_CONFIG (content of ~/.config/copr)." >&2
+            exit 1
+          fi
+          mkdir -p ~/.config
+          umask 077
+          printf '%s' "$COPR_CONFIG" > ~/.config/copr
+
+      - name: Submit SRPM to COPR
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROJECT="frzzzzz19/AIConnect"
+
+          SRPM="$(ls -1 dist/*.src.rpm | head -n 1)"
+          if [ -z "${SRPM}" ] || [ ! -f "${SRPM}" ]; then
+            echo "SRPM not found in dist/" >&2
+            ls -la dist || true
+            exit 1
+          fi
+
+          copr-cli build --nowait "${PROJECT}" "${SRPM}"

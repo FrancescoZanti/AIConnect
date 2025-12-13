@@ -48,7 +48,7 @@ RUN addgroup -g 1000 aiconnect && \
 
 # Crea directories necessarie
 RUN mkdir -p /etc/aiconnect /var/cache/aiconnect/autocert && \
-    chown -R aiconnect:aiconnect /var/cache/aiconnect
+    chown -R aiconnect:aiconnect /etc/aiconnect /var/cache/aiconnect
 
 # Copia binario dal builder
 COPY --from=builder /build/aiconnect /usr/local/bin/aiconnect

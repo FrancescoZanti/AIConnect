@@ -56,6 +56,12 @@ sudo cp config.example.yaml /etc/aiconnect/config.yaml
 sudo nano /etc/aiconnect/config.yaml
 ```
 
+In alternativa puoi usare il wizard interattivo (consigliato quando il file non esiste o contiene ancora valori di esempio):
+
+```bash
+sudo aiconnect --init --config /etc/aiconnect/config.yaml
+```
+
 **Parametri principali:**
 
 ```yaml
@@ -90,6 +96,13 @@ sudo cp aiconnect /usr/local/bin/
 sudo cp deployment/aiconnect.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now aiconnect
+```
+
+Nota: se il servizio non parte perché la configurazione è mancante/incompleta, esegui il wizard e poi riavvia:
+
+```bash
+sudo aiconnect --init --config /etc/aiconnect/config.yaml
+sudo systemctl restart aiconnect
 ```
 
 ### 4. Firewall
@@ -376,17 +389,36 @@ Questo repository usa un file `VERSION` come sorgente della versione.
 - Release RPM: `.github/workflows/release.yml`
 - Immagine container: `.github/workflows/container-image.yml`
 
+### COPR (Fedora/RHEL)
+
+Ad ogni aggiornamento di `VERSION`, oltre alla GitHub Release, viene anche inviato lo SRPM a COPR:
+
+- Progetto: <https://copr.fedorainfracloud.org/coprs/frzzzzz19/AIConnect/>
+- Job: `copr` in `.github/workflows/release.yml`
+
+Prerequisito: configura il secret GitHub `COPR_CONFIG` con il contenuto del file `~/.config/copr` generato da COPR (API token). Il job userà `copr-cli build` e farà partire la build sulle chroot abilitate nel progetto.
+
 ### Changelog
 
 Le modifiche sono tracciate in `CHANGELOG.md`.
 
+## Docker
+
+Se avvii il container in modalità interattiva e il file `AICONNECT_CONFIG` non esiste (default: `/etc/aiconnect/config.yaml`), AIConnect avvia il wizard.
+
+Esempio (wizard + persistenza su volume):
+
+```bash
+docker run --rm -it \
+  -p 443:443 -p 9090:9090 \
+  -v aiconnect-etc:/etc/aiconnect \
+  -v aiconnect-cache:/var/cache/aiconnect \
+  ghcr.io/<owner>/<repo>:v<versione>
+```
+
 ## Licenza
 
 MIT License
-
-## Changelog
-
-Consulta il [CHANGELOG.md](CHANGELOG.md) per la cronologia delle modifiche.
 
 ## Supporto
 

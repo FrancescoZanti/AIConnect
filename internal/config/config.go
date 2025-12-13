@@ -1,8 +1,11 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -66,7 +69,11 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("errore parsing YAML: %w", err)
 	}
 
-	// Valori di default
+	applyDefaults(&cfg)
+	return &cfg, nil
+}
+
+func applyDefaults(cfg *Config) {
 	// AD enabled defaults to true for backward compatibility
 	if cfg.AD.Enabled == nil {
 		defaultEnabled := true
@@ -107,6 +114,101 @@ func Load(path string) (*Config, error) {
 	if len(cfg.MDNS.ServiceTypes) == 0 {
 		cfg.MDNS.ServiceTypes = []string{"_ollama._tcp", "_openai._tcp", "_vllm._tcp"}
 	}
+}
 
-	return &cfg, nil
+func Validate(cfg *Config) error {
+	if cfg == nil {
+		return errors.New("config nil")
+	}
+	applyDefaults(cfg)
+
+	if strings.TrimSpace(cfg.HTTPS.Domain) == "" {
+		return errors.New("https.domain obbligatorio")
+	}
+	if strings.TrimSpace(cfg.HTTPS.CacheDir) == "" {
+		return errors.New("https.cache_dir obbligatorio")
+	}
+	if cfg.HTTPS.Port <= 0 {
+		return errors.New("https.port non valido")
+	}
+
+	adEnabled := cfg.AD.Enabled == nil || *cfg.AD.Enabled
+	if adEnabled {
+		if strings.TrimSpace(cfg.AD.LDAPURL) == "" {
+			return errors.New("ad.ldap_url obbligatorio (quando AD è abilitato)")
+		}
+		if strings.TrimSpace(cfg.AD.BaseDN) == "" {
+			return errors.New("ad.base_dn obbligatorio (quando AD è abilitato)")
+		}
+		if len(cfg.AD.AllowedGroups) == 0 {
+			return errors.New("ad.allowed_groups obbligatorio (quando AD è abilitato)")
+		}
+		// BindDN/BindPassword possono essere opzionali in alcune configurazioni (anonymous bind),
+		// ma in ambienti AD tipici servono; li lasciamo configurabili nel wizard.
+	}
+
+	if len(cfg.Backends.OllamaServers) == 0 && len(cfg.Backends.VLLMServers) == 0 && strings.TrimSpace(cfg.Backends.OpenAIEndpoint) == "" {
+		return errors.New("almeno un backend deve essere configurato (ollama_servers, vllm_servers o openai_endpoint)")
+	}
+	if strings.TrimSpace(cfg.Backends.OpenAIEndpoint) != "" && strings.TrimSpace(cfg.Backends.OpenAIAPIKey) == "" {
+		return errors.New("openai_api_key obbligatoria quando openai_endpoint è configurato")
+	}
+
+	if IsPlaceholderConfig(cfg) {
+		return errors.New("config sembra un esempio non compilato (placeholder)")
+	}
+
+	return nil
+}
+
+func Save(path string, cfg *Config) error {
+	if cfg == nil {
+		return errors.New("config nil")
+	}
+	applyDefaults(cfg)
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("errore serializzazione YAML: %w", err)
+	}
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("errore creazione directory config: %w", err)
+	}
+
+	// Scrive atomico: file temporaneo + rename
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0o600); err != nil {
+		return fmt.Errorf("errore scrittura config: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("errore rename config: %w", err)
+	}
+
+	return nil
+}
+
+func IsPlaceholderConfig(cfg *Config) bool {
+	if cfg == nil {
+		return false
+	}
+
+	// Riconoscimento volutamente conservativo: match su valori esatti del config.example.yaml
+	if strings.TrimSpace(cfg.AD.LDAPURL) == "ldap://ad.example.com:389" {
+		return true
+	}
+	if strings.TrimSpace(cfg.AD.BindPassword) == "your-service-account-password" {
+		return true
+	}
+	if strings.TrimSpace(cfg.AD.BaseDN) == "DC=example,DC=com" {
+		return true
+	}
+	if strings.TrimSpace(cfg.Backends.OpenAIAPIKey) == "sk-your-openai-api-key-here" {
+		return true
+	}
+	if strings.TrimSpace(cfg.HTTPS.Domain) == "aiconnect.example.com" {
+		return true
+	}
+	return false
 }
