@@ -1,0 +1,59 @@
+# AIConnect Compose File
+# Compatibile con Docker Compose e Podman Compose
+#
+# Uso:
+#   Docker:  docker compose up -d
+#   Podman:  podman-compose up -d
+#
+# Prerequisiti:
+#   1. Copia config.example.yaml in config.yaml
+#   2. Modifica config.yaml con i tuoi parametri
+#   3. Esegui compose up
+
+services:
+  aiconnect:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: aiconnect:latest
+    container_name: aiconnect
+    ports:
+      # HTTPS proxy
+      - "443:443"
+      # Prometheus metrics
+      - "9090:9090"
+    volumes:
+      # Configurazione (obbligatorio)
+      - ./config.yaml:/etc/aiconnect/config.yaml:ro
+      # Cache certificati LetsEncrypt (persistenza)
+      - aiconnect-certs:/var/cache/aiconnect
+    environment:
+      - AICONNECT_CONFIG=/etc/aiconnect/config.yaml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    # Limiti risorse (opzionale, decommenta se necessario)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2'
+    #       memory: 512M
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 128M
+
+# Volume per persistenza certificati TLS
+volumes:
+  aiconnect-certs:
+    driver: local
+
+# Network personalizzato (opzionale)
+# Decommenta per creare una network dedicata
+# networks:
+#   default:
+#     name: aiconnect-network
+#     driver: bridge

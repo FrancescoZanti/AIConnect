@@ -102,6 +102,24 @@ sudo firewall-cmd --permanent --add-port=9090/tcp
 sudo firewall-cmd --reload
 ```
 
+### 5. Installazione con Docker/Podman
+
+AIConnect può essere eseguito anche in container. Vedi la [guida Docker/Podman](docs/docker.md) per istruzioni dettagliate.
+
+```bash
+# Quick start con Docker
+docker compose up -d
+
+# Quick start con Podman
+podman-compose up -d
+
+# Oppure usando Make
+make container-build
+make container-run
+```
+
+Per configurazione avanzata, networking e troubleshooting, consulta [docs/docker.md](docs/docker.md).
+
 ## Utilizzo
 
 ### Avvio/Stop
@@ -311,12 +329,21 @@ aiconnect/
 │   ├── auth/              # LDAP authentication
 │   ├── config/            # Configuration loading
 │   ├── loadbalancer/      # Ollama load balancing
+│   ├── mdns/              # mDNS discovery
 │   ├── metrics/           # Prometheus metrics
-│   └── proxy/             # Reverse proxy handler
+│   ├── proxy/             # Reverse proxy handler
+│   └── registry/          # Backend registry
 ├── deployment/
 │   ├── aiconnect.service  # Systemd service
 │   └── install.sh         # Installation script
+├── docs/
+│   └── docker.md          # Docker/Podman guide
+├── tools/
+│   └── ollama-metrics/    # Metrics server for Ollama
+├── Containerfile          # Container build file
+├── compose.yaml           # Docker/Podman compose
 ├── config.example.yaml    # Configuration example
+├── CHANGELOG.md           # Version history
 ├── go.mod
 └── README.md
 ```
@@ -356,6 +383,10 @@ Le modifiche sono tracciate in `CHANGELOG.md`.
 ## Licenza
 
 MIT License
+
+## Changelog
+
+Consulta il [CHANGELOG.md](CHANGELOG.md) per la cronologia delle modifiche.
 
 ## Supporto
 

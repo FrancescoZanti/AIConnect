@@ -92,12 +92,12 @@ func (a *Advertiser) Start() error {
 
 	// Register the service
 	server, err := zeroconf.Register(
-		a.config.ServiceName,     // Service instance name
-		AIConnectServiceType,     // Service type
-		a.config.Domain,          // Domain
-		a.config.Port,            // Port
-		txtRecords,               // TXT records
-		getInterfaces(ips),       // Interfaces to register on
+		a.config.ServiceName, // Service instance name
+		AIConnectServiceType, // Service type
+		a.config.Domain,      // Domain
+		a.config.Port,        // Port
+		txtRecords,           // TXT records
+		getInterfaces(ips),   // Interfaces to register on
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register mDNS service: %w", err)
