@@ -13,7 +13,7 @@ Reverse proxy HTTPS in Go per l'instradamento intelligente di richieste AI verso
 
 ## Architettura di Sistema
 
-```
+```text
 Internet → HTTPS (443) → AIConnect → AD Auth → Load Balancer → Ollama Servers (N)
                                               ↘
                                                 → OpenAI API
@@ -199,6 +199,7 @@ Le metriche GPU hanno peso maggiorato (fattore 1.5x) in quanto l'inferenza di mo
 ### Hardening Systemd
 
 Il service file include direttive di security hardening:
+
 - `NoNewPrivileges=true`: Previene privilege escalation
 - `PrivateTmp=true`: Filesystem /tmp isolato
 - `ProtectSystem=strict`: Filesystem di sistema read-only
@@ -301,7 +302,7 @@ Intervalli brevi (10-15s) migliorano reattività ma aumentano carico rete. Defau
 
 ### Struttura Progetto
 
-```
+```text
 aiconnect/
 ├── cmd/
 │   └── aiconnect/         # Main application
@@ -329,6 +330,28 @@ go build -o aiconnect ./cmd/aiconnect
 # Run con config custom
 AICONNECT_CONFIG=./config.yaml ./aiconnect
 ```
+
+## Versioning, Release e Packaging
+
+Questo repository usa un file `VERSION` come sorgente della versione.
+
+### Come pubblicare una nuova versione
+
+1. Aggiorna il valore in `VERSION` (es. `0.0.2`).
+2. Esegui commit e push su `main`.
+3. Le GitHub Actions generano automaticamente:
+
+    - una GitHub Release con tag `v<versione>` e asset RPM/SRPM per Fedora e RHEL 10
+    - un’immagine container su GHCR con tag `v<versione>` e `latest`
+
+### Workflow CI
+
+- Release RPM: `.github/workflows/release.yml`
+- Immagine container: `.github/workflows/container-image.yml`
+
+### Changelog
+
+Le modifiche sono tracciate in `CHANGELOG.md`.
 
 ## Licenza
 
