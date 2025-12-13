@@ -166,7 +166,6 @@ jobs:
     name: Submit build to COPR
     runs-on: ubuntu-latest
     needs: [source, rpm]
-    if: ${{ secrets.COPR_CONFIG != '' }}
     container:
       image: fedora:latest
     steps:
