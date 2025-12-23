@@ -25,9 +25,14 @@ backends:
   openai_api_key: "sk-your-openai-api-key-here"
 
 https:
+  # Option 1: Use LetsEncrypt autocert (domain and cache_dir required)
   domain: "aiconnect.example.com"
   cache_dir: "/var/cache/aiconnect/autocert"
   port: 443
+  # Option 2: Use custom SSL certificates (cert_file and key_file)
+  # When both cert_file and key_file are provided, autocert is disabled
+  # cert_file: "/etc/ssl/certs/aiconnect.crt"
+  # key_file: "/etc/ssl/private/aiconnect.key"
 
 monitoring:
   health_check_interval: 30  # secondi

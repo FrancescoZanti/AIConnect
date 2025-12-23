@@ -211,29 +211,60 @@ func isInteractiveStdin() bool {
 		}
 	}()
 
-	// Configure autocert manager for LetsEncrypt
-	certManager := autocert.Manager{
-		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(cfg.HTTPS.Domain),
-		Cache:      autocert.DirCache(cfg.HTTPS.CacheDir),
-	}
-
 	// Configure HTTPS server
 	httpsAddr := fmt.Sprintf(":%d", cfg.HTTPS.Port)
 	server := &http.Server{
-		Addr:      httpsAddr,
-		Handler:   mux,
-		TLSConfig: certManager.TLSConfig(),
+		Addr:    httpsAddr,
+		Handler: mux,
 	}
 
-	log.WithFields(logrus.Fields{
-		"address": httpsAddr,
-		"domain":  cfg.HTTPS.Domain,
-	}).Info("Server HTTPS in avvio")
+	// Validate SSL certificate configuration
+	hasCertFile := cfg.HTTPS.CertFile != ""
+	hasKeyFile := cfg.HTTPS.KeyFile != ""
 
-	// Start HTTPS server
-	if err := server.ListenAndServeTLS("", ""); err != nil {
-		log.WithError(err).Fatal("Errore server HTTPS")
+	if hasCertFile != hasKeyFile {
+		log.Fatal("Configurazione SSL non valida: cert_file e key_file devono essere entrambi specificati o entrambi omessi")
+	}
+
+	useCustomCerts := hasCertFile && hasKeyFile
+
+	if useCustomCerts {
+		// Verify certificate files exist and are readable
+		if _, err := os.Stat(cfg.HTTPS.CertFile); os.IsNotExist(err) {
+			log.WithField("cert_file", cfg.HTTPS.CertFile).Fatal("File certificato SSL non trovato")
+		}
+		if _, err := os.Stat(cfg.HTTPS.KeyFile); os.IsNotExist(err) {
+			log.WithField("key_file", cfg.HTTPS.KeyFile).Fatal("File chiave SSL non trovato")
+		}
+
+		log.WithFields(logrus.Fields{
+			"address":   httpsAddr,
+			"cert_file": cfg.HTTPS.CertFile,
+			"key_file":  cfg.HTTPS.KeyFile,
+		}).Info("Server HTTPS in avvio con certificati custom")
+
+		// Start HTTPS server with user-provided certificates
+		if err := server.ListenAndServeTLS(cfg.HTTPS.CertFile, cfg.HTTPS.KeyFile); err != nil {
+			log.WithError(err).Fatal("Errore server HTTPS")
+		}
+	} else {
+		// Configure autocert manager for LetsEncrypt
+		certManager := autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist(cfg.HTTPS.Domain),
+			Cache:      autocert.DirCache(cfg.HTTPS.CacheDir),
+		}
+		server.TLSConfig = certManager.TLSConfig()
+
+		log.WithFields(logrus.Fields{
+			"address": httpsAddr,
+			"domain":  cfg.HTTPS.Domain,
+		}).Info("Server HTTPS in avvio con autocert LetsEncrypt")
+
+		// Start HTTPS server with autocert
+		if err := server.ListenAndServeTLS("", ""); err != nil {
+			log.WithError(err).Fatal("Errore server HTTPS")
+		}
 	}
 }
 
